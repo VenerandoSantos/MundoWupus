@@ -12,7 +12,7 @@ Aplicação web em Python que simula uma arena 8x8 interativa com visualização
 ### 1️⃣ Clonar ou Acessar o Projeto
 
 ```bash
-cd c:\Users\gabri\Desktop\MundoWunpus
+git clone https://github.com/VenerandoSantos/MundoWupus
 ```
 
 ### 2️⃣ Instalar as Dependências
@@ -41,7 +41,7 @@ Servidor iniciando em http://localhost:5000
 
 1. Abra seu navegador favorito (Chrome, Firefox, Edge, etc.)
 2. Acesse: **http://localhost:5000**
-3. Você verá a arena 8x8 carregada e interativa!
+3. Você verá a arena carregada e interativa!
 
 ## 📁 Estrutura do Projeto
 
@@ -64,9 +64,9 @@ MundoWunpus/
 
 ## 🕹️ Como Usar
 
-- **Visualizar Arena**: A arena 8x8 aparece automaticamente ao acessar o site
+- **Visualizar Arena**: A arena aparece automaticamente ao acessar o site
 - **Resetar Arena**: Clique no botão "Resetar Arena" para gerar uma nova com elementos aleatórios
-- **Clicar em Células**: Clique em qualquer célula para interagir (funcionalidade expandível)
+- **EmDesenvolvimento**: 
 
 ## ⚙️ Configuração
 
