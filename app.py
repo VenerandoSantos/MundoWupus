@@ -6,12 +6,11 @@ app = Flask(__name__)
 # Inicializar a arena 4x4
 arena = [[0 for _ in range(4)] for _ in range(4)]
 
-
+#inicializar a arena com obstáculos e alvos
 def initialize_arena():
     global arena
     arena = [[0 for _ in range(4)] for _ in range(4)]
-    arena[0][0] = 1
-    # Adicionar alguns elementos aleatórios na arena (1 = obstáculo, 2 = alvo)
+    arena[0][0] = 3  # Posição inicial do agente
     for _ in range(1):
         while True:
             x, y = random.randint(0, 3), random.randint(0, 3)
@@ -24,7 +23,7 @@ def initialize_arena():
         while True:
             x, y = random.randint(0, 3), random.randint(0, 3)
             if arena[x][y] == 0:
-                arena[x][y] = 2  # Alvo
+                arena[x][y] = 2  # wunpu
                 break
 
 @app.route('/')
