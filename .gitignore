@@ -1,0 +1,91 @@
+# Ambiente Virtual
+venv/
+env/
+ENV/
+.venv/
+
+# Dependências instaladas
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDE e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.atom/
+.vscode-server/
+
+# Arquivos do Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Flask
+instance/
+.webassets-cache
+
+# Bancos de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+*.temp
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Cache do pip
+.cache/
+pip-cache/
+
+# Node (caso use frontend tools)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Arquivos compilados
+*.pyc
+*.pyo
+
+# Pastas específicas do projeto
+__pycache__/
+*.egg-info/
+dist/
+build/

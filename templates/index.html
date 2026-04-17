@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena 8x8</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .arena-wrapper {
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .arena {
+            display: grid;
+            grid-template-columns: repeat(4, 50px);
+            grid-gap: 2px;
+            background: #333;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: #e0e0e0;
+            border: 1px solid #999;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .cell.empty {
+            background: #f5f5f5;
+        }
+
+        .cell.obstacle {
+            background: #333;
+            color: #ff6b6b;
+        }
+
+        .cell.target {
+            background: #4ecdc4;
+            color: #fff;
+        }
+
+        .controls {
+            margin-top: 30px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .legend {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-box {
+            width: 30px;
+            height: 30px;
+            border-radius: 3px;
+            border: 1px solid #999;
+        }
+
+        .legend-empty { background: #f5f5f5; }
+        .legend-obstacle { background: #333; }
+        .legend-target { background: #4ecdc4; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Arena 8x8</h1>
+        
+        <div class="arena-wrapper">
+            <div class="arena" id="arena"></div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box legend-empty"></div>
+                <span>Vazio</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box legend-obstacle"></div>
+                <span>Obstáculo</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box legend-target"></div>
+                <span>Alvo</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="resetArena()">Resetar Arena</button>
+        </div>
+
+        <div class="info">
+            <p>Clique nas células para interagir com a arena</p>
+        </div>
+    </div>
+
+    <script>
+        const CELL_SIZE = 50;
+        const GAP = 2;
+
+        // Carregar e exibir a arena
+        async function loadArena() {
+            try {
+                const response = await fetch('/api/arena');
+                const arena = await response.json();
+                renderArena(arena);
+            } catch (error) {
+                console.error('Erro ao carregar arena:', error);
+            }
+        }
+
+        // Renderizar a arena na tela
+        function renderArena(arena) {
+            const arenaElement = document.getElementById('arena');
+            arenaElement.innerHTML = '';
+
+            arena.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    const cellElement = document.createElement('div');
+                    cellElement.className = 'cell';
+
+                    if (cell === 0) {
+                        cellElement.classList.add('empty');
+                        cellElement.textContent = '';
+                    } else if (cell === 1) {
+                        cellElement.classList.add('obstacle');
+                        cellElement.textContent = '🚫';
+                    } else if (cell === 2) {
+                        cellElement.classList.add('target');
+                        cellElement.textContent = '🎯';
+                    }
+
+                    cellElement.addEventListener('click', () => {
+                        handleCellClick(rowIndex, colIndex);
+                    });
+
+                    arenaElement.appendChild(cellElement);
+                });
+            });
+        }
+
+        // Lidar com cliques nas células
+        function handleCellClick(row, col) {
+            console.log(`Célula clicada: [${row}, ${col}]`);
+        }
+
+        // Resetar a arena
+        async function resetArena() {
+            try {
+                const response = await fetch('/api/reset');
+                const arena = await response.json();
+                renderArena(arena);
+                console.log('Arena resetada!');
+            } catch (error) {
+                console.error('Erro ao resetar arena:', error);
+            }
+        }
+
+        // Carregar arena ao iniciar
+        loadArena();
+    </script>
+</body>
+</html>
