@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import random
 
 app = Flask(__name__)
@@ -38,7 +38,76 @@ def get_arena():
 @app.route('/api/reset')
 def reset_arena():
     initialize_arena()
-    return jsonify(arena)
+    return jsonify({'arena': arena})
+
+@app.route('/api/move', methods=['POST'])
+def move():
+    data = request.get_json()
+    direction = data.get('direction')
+    global arena
+    
+    # Encontrar posição do agente
+    agent_pos = None
+    for i in range(4):
+        for j in range(4):
+            if arena[i][j] == 3:
+                agent_pos = (i, j)
+                break
+    
+    if agent_pos is None:
+        return jsonify({'arena': arena})
+    
+    row, col = agent_pos
+    
+    if direction == 'up':
+        if row == 0:
+            consequence = 'bumbed'
+        elif arena[row - 1][col] == 1:  # Verifica se não é obstáculo
+            arena[row][col] = 0
+            arena[row - 1][col] = 4  # Marca o agente como morto
+            consequence = 'falled'
+        else:
+            arena[row][col] = 0
+            arena[row - 1][col] = 3
+            consequence = 'moved'
+    
+    elif direction == 'down':
+        if row == 3:
+            consequence = 'bumbed'  
+        elif arena[row + 1][col] == 1:
+            arena[row][col] = 0
+            arena[row + 1][col] = 4  # Marca o agente como morto
+            consequence = 'falled'
+        else:
+            arena[row][col] = 0
+            arena[row + 1][col] = 3
+            consequence = 'moved'
+
+    elif direction == 'left':
+        if col == 0:
+            consequence = 'bumbed'
+        elif arena[row][col - 1] == 1:
+            arena[row][col] = 0
+            arena[row][col - 1] = 4  # Marca o agente como morto
+            consequence = 'falled'
+        else:
+            arena[row][col] = 0
+            arena[row][col - 1] = 3
+            consequence = 'moved'
+
+    elif direction == 'right':
+        if col == 3:
+            consequence = 'bumbed'
+        elif arena[row][col + 1] == 1:
+            arena[row][col] = 0
+            arena[row][col + 1] = 4  # Marca o agente como morto
+            consequence = 'falled'
+        else:
+            arena[row][col] = 0
+            arena[row][col + 1] = 3
+            consequence = 'moved'
+    
+    return jsonify({'arena': arena,'consequence': consequence})
 
 if __name__ == '__main__':
     print("Servidor iniciando em http://localhost:5000")

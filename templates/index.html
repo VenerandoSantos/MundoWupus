@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arena 8x8</title>
+    <title>Arena 4x4</title>
     <style>
         * {
             margin: 0;
@@ -78,8 +78,18 @@
         }
 
         .cell.target {
-            background: #4ecdc4;
-            color: #fff;
+            background: #cc0ccc;
+            color: #f50404;
+        }
+        
+        .cell.agente {
+            background: #f5f5f5;
+            color: #f50404;
+        }
+
+        .cell.morto {
+            background: #000000;
+            color: #ffffff;
         }
 
         .controls {
@@ -141,7 +151,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎮 Arena 8x8</h1>
+        <h1>🎮 Mundo Wupus</h1>
         
         <div class="arena-wrapper">
             <div class="arena" id="arena"></div>
@@ -163,9 +173,16 @@
         </div>
 
         <div class="controls">
+            <button onclick="moveAgent('up')">⬆</button>
+            <button onclick="moveAgent('down')">⬇</button>
+            <button onclick="moveAgent('left')">⬅</button>
+            <button onclick="moveAgent('right')">➡</button>
+        </div>
+        
+        <div class="controls">
             <button onclick="resetArena()">Resetar Arena</button>
         </div>
-
+        
         <div class="info">
             <p>Clique nas células para interagir com a arena</p>
         </div>
@@ -204,7 +221,13 @@
                         cellElement.textContent = '🚫';
                     } else if (cell === 2) {
                         cellElement.classList.add('target');
-                        cellElement.textContent = '🎯';
+                        cellElement.textContent = '👹';
+                    } else if (cell === 3) {
+                        cellElement.classList.add('agente');
+                        cellElement.textContent = '🥷';
+                    } else if (cell === 4) {
+                        cellElement.classList.add('morto');
+                        cellElement.textContent = '💀';
                     }
 
                     cellElement.addEventListener('click', () => {
@@ -225,11 +248,26 @@
         async function resetArena() {
             try {
                 const response = await fetch('/api/reset');
-                const arena = await response.json();
-                renderArena(arena);
+                const data = await response.json();
+                renderArena(data.arena);
                 console.log('Arena resetada!');
             } catch (error) {
                 console.error('Erro ao resetar arena:', error);
+            }
+        }
+
+        async function moveAgent(direction) {
+            try {
+                const response = await fetch('/api/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ direction })
+                });
+                const data = await response.json();
+                renderArena(data.arena);
+                console.log(`Agente movido para ${direction}`);
+            } catch (error) {
+                console.error('Erro ao mover agente:', error);
             }
         }
 
