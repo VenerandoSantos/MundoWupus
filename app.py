@@ -102,16 +102,8 @@ def reset_arena():
 
 #`andar(direcao)`: Move o agente para uma casa adjacente válida.
 @app.route('/api/move', methods=['POST'])
-def move(direcao=None, direction=None):
-    # Se chamado via POST, pega os dados do JSON
-    if request.method == 'POST':
-        data = request.get_json()
-        direction = data.get('direction')
-    # Se chamado pela IA, usa o argumento direcao ou direction
-    elif direcao:
-        direction = direcao
-    
-    data = {"direction": direction}
+def move():
+    data = request.get_json()
     return move_logic(data)
 
 #`atirar(direcao)`: Dispara a única flecha na tentativa de matar o Wumpus.
@@ -164,8 +156,6 @@ def move_logic(data):
     """Lógica de movimento extraída da função move() para reutilização"""
     direction = data.get('direction')
     global arena
-    
-    consequence = 'invalid'  # Valor padrão
 
     # Encontrar posição do agente
     row, col = person.posicao
@@ -253,7 +243,7 @@ def command():
             break
     else:
         print("IA não chegou a uma resposta final após 10 tentativas.")
-    
+        
 
 def get_user_info():
     return jsonify({
