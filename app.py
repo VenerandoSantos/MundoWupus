@@ -6,11 +6,25 @@ app = Flask(__name__)
 # Inicializar a arena 4x4
 arena = [[0 for _ in range(4)] for _ in range(4)]
 
+class agente:
+    def __init__(self):
+        self.posicao = [1, 1]  # Posição inicial do agente
+        self.has_arrow = True
+        self.has_gold = False
+
+    def resetar(self):
+        self.posicao = [1, 1]
+        self.has_arrow = True
+        self.has_gold = False
+
 #inicializar a arena com obstáculos e alvos
-def initialize_arena():
+def initialize_game():
     global arena
+    global person
+    person = agente()
+
     arena = [[0 for _ in range(4)] for _ in range(4)]
-    arena[0][0] = 3  # Posição inicial do agente
+    arena[person.posicao[0]][person.posicao[1]] = 3  # Posição inicial do agente
     for _ in range(1):
         while True:
             x, y = random.randint(0, 3), random.randint(0, 3)
@@ -23,12 +37,12 @@ def initialize_arena():
         while True:
             x, y = random.randint(0, 3), random.randint(0, 3)
             if arena[x][y] == 0:
-                arena[x][y] = 2  # wunpu
+                arena[x][y] = 2  # Wumpus
                 break
 
 @app.route('/')
 def index():
-    initialize_arena()
+    initialize_game()
     return render_template('index.html')
 
 @app.route('/api/arena')
@@ -37,9 +51,14 @@ def get_arena():
 
 @app.route('/api/reset')
 def reset_arena():
-    initialize_arena()
+    initialize_game()
     return jsonify({'arena': arena})
 
+
+#`pegar_ouro()`: Coleta o ouro se estiver na mesma casa.
+#`escalar_saida()`: Finaliza o jogo se o agente estiver na casa [1,1].
+
+#`andar(direcao)`: Move o agente para uma casa adjacente válida.
 @app.route('/api/move', methods=['POST'])
 def move():
     data = request.get_json()
@@ -47,17 +66,7 @@ def move():
     global arena
     
     # Encontrar posição do agente
-    agent_pos = None
-    for i in range(4):
-        for j in range(4):
-            if arena[i][j] == 3:
-                agent_pos = (i, j)
-                break
-    
-    if agent_pos is None:
-        return jsonify({'arena': arena})
-    
-    row, col = agent_pos
+    row, col = person.posicao
     
     if direction == 'up':
         if row == 0:
@@ -69,6 +78,7 @@ def move():
         else:
             arena[row][col] = 0
             arena[row - 1][col] = 3
+            person.posicao = [row - 1, col]  # Atualiza a posição do agente
             consequence = 'moved'
     
     elif direction == 'down':
@@ -81,6 +91,7 @@ def move():
         else:
             arena[row][col] = 0
             arena[row + 1][col] = 3
+            person.posicao = [row + 1, col]  # Atualiza a posição do agente
             consequence = 'moved'
 
     elif direction == 'left':
@@ -93,6 +104,7 @@ def move():
         else:
             arena[row][col] = 0
             arena[row][col - 1] = 3
+            person.posicao = [row, col - 1]  # Atualiza a posição do agente
             consequence = 'moved'
 
     elif direction == 'right':
@@ -105,9 +117,12 @@ def move():
         else:
             arena[row][col] = 0
             arena[row][col + 1] = 3
+            person.posicao = [row, col + 1]  # Atualiza a posição do agente
             consequence = 'moved'
     
     return jsonify({'arena': arena,'consequence': consequence})
+
+#`atirar(direcao)`: Dispara a única flecha na tentativa de matar o Wumpus.
 
 if __name__ == '__main__':
     print("Servidor iniciando em http://localhost:5000")
