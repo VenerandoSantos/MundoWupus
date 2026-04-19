@@ -17,20 +17,20 @@ llm = ChatGroq(
     reasoning_format="parsed"
 )
 
-#teste groq
-resposta = llm.invoke("voce está funcinado?")
-print(resposta)
+app = Flask(__name__)
 
 SYSTEM_PROMPT =""""
 Voce eh um agente inteligente que deve coletar o ouro e sair da arena. A arena é um grid 4x4, onde cada célula pode conter:
 0: Célula vazia
-1: Buraco (obstáculo)
-2: Wumpus (alvo)
+1: Buraco (obstáculo)  deve ser evitado
+2: Wumpus (monstro) deve ser evitado 
 3: Agente (sua posição atual)
+5: Ouro (objetivo) objetivo principal caso nao usuario nao especifique outra missao
 
 Você tem acesso às seguintes ferramentas:
-move(direcao): Move o agente para uma casa adjacente válida. As direções podem ser 'up', 'down', 'left' ou 'right'.
-
+move(direcao): Move o agente para uma casa adjacente válida. As direções podem ser 'up', 'down', 'left' ou 'right'. e retorna uma consequência do movimento (ex: 'moved', 'bumped', 'falled').
+getSentidos(): checa o ambiente atual do agente, como brilho do ouro na posição atual ou próximo, fedor do wumpus no espaço vizinho e vento de buraco em uma area vizinha
+pegar_ouro(): Coleta o ouro quando você está na mesma posição que ele (quando getSentidos retorna brilho=true na sua posição)
 
 Para usar uma ferramenta, você deve responder com um JSON no seguinte formato:
 Action:
@@ -44,12 +44,58 @@ Action:
   "action": "move",
   "action_input": {"direcao": "up"}
 }
-"""
 
-app = Flask(__name__)
+O ciclo de interação deve ser SEMPRE:
+Thought: Com base nas informações disponíveis, o que você acha que deveria fazer?
+Action: (o bloco JSON acima)
+Observation: (o resultado da ferramenta que eu te passarei)
+... (repetir se necessário)
+Final Answer: As observações e pensamentos não vão ficar disponíveis para o usuário. Crie uma resposta final em linguagem natural para ser apresentada ao usuário. Apenas escreva Final Answer quando tiver terminado tudo.
+"""
 
 # Inicializar a arena 4x4
 arena = [[0 for _ in range(4)] for _ in range(4)]
+
+# Armazenar posições de objetos separadamente para não serem sobrescritos
+objetos = {
+    'ouro': None,      # Posição do ouro (x, y)
+    'buraco': None,    # Posição do buraco (x, y)
+    'wumpus': None     # Posição do Wumpus (x, y)
+}
+
+def getSentidos():
+    global person, objetos
+    row, col = person.posicao
+    brilho = False
+    fedor = False
+    vento = False
+
+    # Verificar se tem ouro na posição e somente na atual
+    if objetos['ouro'] is not None:
+        ouro_x, ouro_y = objetos['ouro']
+        # Ouro na posição atual
+        if ouro_x == row and ouro_y == col:
+            brilho = True
+
+    # Verificar buraco nas vizinhas
+    if objetos['buraco'] is not None:
+        buraco_x, buraco_y = objetos['buraco']
+        if (abs(buraco_x - row) == 1 and buraco_y == col) or (abs(buraco_y - col) == 1 and buraco_x == row):
+            vento = True
+    
+    # Verificar Wumpus nas vizinhas
+    if objetos['wumpus'] is not None:
+        wumpus_x, wumpus_y = objetos['wumpus']
+        if (abs(wumpus_x - row) == 1 and wumpus_y == col) or (abs(wumpus_y - col) == 1 and wumpus_x == row):
+            fedor = True
+
+    sentidos = {
+        "brilho": brilho,
+        "fedor": fedor,
+        "vento": vento
+    }
+
+    return sentidos
 
 class agente:
     def __init__(self):
@@ -59,103 +105,90 @@ class agente:
 
 #inicializar a arena com obstáculos e alvos
 def initialize_game():
-    global arena
-    global person
+    global arena, person, objetos
     person = agente()
 
     arena = [[0 for _ in range(4)] for _ in range(4)]
     arena[person.posicao[0]][person.posicao[1]] = 3  # Posição inicial do agente
 
     #adiciona Buraco
-    for _ in range(1):
-        while True:
-            x, y = random.randint(0, 3), random.randint(0, 3)
-            if arena[x][y] == 0:
-                arena[x][y] = 1  # Obstáculo
-                break
+    while True:
+        x, y = random.randint(0, 3), random.randint(0, 3)
+        if (x, y) != tuple(person.posicao) and arena[x][y] == 0:
+            arena[x][y] = 1  # Buraco
+            objetos['buraco'] = (x, y)
+            break
 
-    # Adiciona alguns alvos
-    for _ in range(1):
-        while True:
-            x, y = random.randint(0, 3), random.randint(0, 3)
-            if arena[x][y] == 0:
-                arena[x][y] = 2  # Wumpus
-                break
+    # Adiciona Wumpus
+    while True:
+        x, y = random.randint(0, 3), random.randint(0, 3)
+        if (x, y) != tuple(person.posicao) and arena[x][y] == 0:
+            arena[x][y] = 2  # Wumpus
+            objetos['wumpus'] = (x, y)
+            break
+    
+    # Adiciona Ouro
+    while True:
+        x, y = random.randint(0, 3), random.randint(0, 3)
+        if (x, y) != tuple(person.posicao) and arena[x][y] == 0:
+            arena[x][y] = 5  # Ouro
+            objetos['ouro'] = (x, y)
+            break
 
 @app.route('/')
 def index():
     initialize_game()
     return render_template('index.html')
 
+def render_arena_display():
+    """Renderiza a arena incluindo todos os objetos sem sobrescrever o agente"""
+    arena_display = [[arena[i][j] for j in range(4)] for i in range(4)]
+    
+    # Adicionar objetos se não foram coletados/destruídos
+    if objetos['ouro'] is not None:
+        x, y = objetos['ouro']
+        if arena_display[x][y] == 0:
+            arena_display[x][y] = 5
+    
+    return [list(row) for row in arena_display]
+
+
 @app.route('/api/arena')
 def get_arena():
-    return jsonify(arena)
+    arena_display = render_arena_display()
+    return jsonify(arena_display)
+
 
 @app.route('/api/reset')
 def reset_arena():
     initialize_game()
-    return jsonify({'arena': arena})
+    arena_display = render_arena_display()
+    return jsonify({'arena': arena_display})
 
 
-#`pegar_ouro()`: Coleta o ouro se estiver na mesma casa.
-#`escalar_saida()`: Finaliza o jogo se o agente estiver na casa [1,1].
-
-#`andar(direcao)`: Move o agente para uma casa adjacente válida.
 @app.route('/api/move', methods=['POST'])
-def move():
-    data = request.get_json()
-    return move_logic(data)
-
-#`atirar(direcao)`: Dispara a única flecha na tentativa de matar o Wumpus.
-
-@app.route('/api/ai_move', methods=['POST'])
-def ai_move():
-    global arena
-
-    # Converter arena para string legível
-    arena_str = "\n".join([" ".join(map(str, row)) for row in arena])
-
-    # Prompt para a IA
-    prompt = f"""{SYSTEM_PROMPT}
-
-Estado atual da arena:
-{arena_str}
-
-Posição do agente: {person.posicao}
-Tem flecha: {person.has_arrow}
-Tem ouro: {person.has_gold}
-
-Decida sua próxima ação baseada no estado atual."""
-
-    try:
-        # Chamar a IA
-        response = llm.invoke(prompt)
-        ai_response = response.content.strip()
-
-        # Extrair ação da resposta da IA
-        if "Action:" in ai_response:
-            action_part = ai_response.split("Action:")[1].strip()
-            import json
-            action_data = json.loads(action_part)
-
-            if action_data["action"] == "move":
-                direction = action_data["action_input"]["direcao"]
-
-                # Executar movimento
-                data = {"direction": direction}
-                # Simular a requisição para a função move
-                move_result = move_logic(data)
-                return move_result
-        else:
-            return jsonify({"error": "IA não retornou uma ação válida", "response": ai_response})
-
-    except Exception as e:
-        return jsonify({"error": f"Erro na IA: {str(e)}"})
+def move(direcao=None, direction=None):
+    # Se chamado pela IA (função Python) com parâmetro direcao
+    if direcao:
+        direction = direcao
+    # Se chamado via POST (API REST)
+    elif direction is None:
+        try:
+            data = request.get_json()
+            direction = data.get('direction')
+        except:
+            direction = None
+    
+    result = move_logic({'direction': direction})
+    return jsonify(result)
 
 def move_logic(data):
     """Lógica de movimento extraída da função move() para reutilização"""
+    global arena, person
+    
     direction = data.get('direction')
-    global arena
+    print(f"DEBUG: direction recebida = '{direction}'")  # Debug
+    consequence = 'invalid'  # Valor padrão
 
     # Encontrar posição do agente
     row, col = person.posicao
@@ -211,18 +244,30 @@ def move_logic(data):
             arena[row][col + 1] = 3
             person.posicao = [row, col + 1]  # Atualiza a posição do agente
             consequence = 'moved'
-
-    return jsonify({'arena': arena, 'consequence': consequence, 'ai_decision': direction})
+    
+    # Retornar dicionário (será convertido em JSON pela chamadora)
+    arena_display = render_arena_display()
+    result = {'arena': arena_display, 'consequence': consequence, 'direction': direction}
+    return result
 
 @app.route('/api/command', methods=['POST'])
 def command():
+    global person, arena
+    
+    # Inicializar o jogo se ainda não foi inicializado
+    if 'person' not in globals():
+        initialize_game()
+    
     mensagemUser = request.json.get('command')
+    arena_history = []  # Histórico de estados da arena
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": mensagemUser}
     ]
     print("iniciando IA\n")
+    print(mensagemUser + "\n")
+    print("\n");
     for i in range (10):
         print(f"-------tentativa {i+1}-------\n")
 
@@ -231,41 +276,107 @@ def command():
         print(respostaIA)
 
         if "Final Answer:" in respostaIA:
+            print("IA chegou a uma resposta final. Encerrando o loop.")
+            # Adicionar estado final
+            arena_history.append(render_arena_display())
             break
         
         if "Action:" in respostaIA:
             resultadoFerramenta = call_tool(respostaIA)
             print(f"Resultado da ferramenta: {resultadoFerramenta}\n")
+            
+            # Adicionar estado atual ao histórico após a ação
+            arena_history.append(render_arena_display())
+            
             historico_turno = respostaIA + "\nResultado da ferramenta: " + str(resultadoFerramenta) +"\n"
             messages.append({"role": "assistant", "content": historico_turno})
         else:
             print("IA não retornou uma ação válida. Encerrando o loop.")
+            print(respostaIA)
+            # Adicionar estado atual mesmo quando há erro
+            arena_history.append(render_arena_display())
             break
     else:
         print("IA não chegou a uma resposta final após 10 tentativas.")
-        
+        # Adicionar estado final após max tentativas
+        arena_history.append(render_arena_display())
+    
+    # Se o histórico estiver vazio, adicionar pelo menos o estado atual
+    if not arena_history:
+        arena_history.append(render_arena_display())
+    
+    # Usar o último estado do histórico
+    final_arena = arena_history[-1] if arena_history else render_arena_display()
+    print(f"DEBUG: Arena sendo retornada: {final_arena}")
+    print(f"DEBUG: Histórico tem {len(arena_history)} estados")
+    
+    return jsonify({
+        'arena': final_arena,
+        'arena_history': arena_history,  # Novo: histórico de todos os estados
+        'position': person.posicao,
+        'has_arrow': person.has_arrow,
+        'has_gold': person.has_gold
+    })
 
 def get_user_info():
     return jsonify({
+
         "position": person.posicao,
         "has_arrow": person.has_arrow,
         "has_gold": person.has_gold
     })
 
+#`pegar_ouro()`: Coleta o ouro se estiver na mesma casa.
+def pegar_ouro():
+    global person, objetos
+    row, col = person.posicao
+    # Se o ouro está na posição do agente, coletá-lo
+    if objetos['ouro'] is not None:
+        ouro_x, ouro_y = objetos['ouro']
+        if ouro_x == row and ouro_y == col:
+            objetos['ouro'] = None  # Remove o ouro
+            person.has_gold = True  # Marca que o agente tem o ouro
+
 def call_tool(response: str) -> str:
-    tool_call = loads(response.split("Action:")[1])
-    kwargs = tool_call["action_input"]
-    match tool_call["action"]:
-        case "move":
-            return move(**kwargs)
-        case "get_user_info":
-            return get_user_info()
-        case "borrow_book":
-            return 
-        case "return_book":
-            return 
-        case _:
-            return f'A ferramenta "{tool_call["action"]}" não existe. Confirme as funções disponíveis.'
+    try:
+        # Extrair o JSON após "Action:"
+        action_text = response.split("Action:")[1].strip()
+        
+        # Encontrar o primeiro '{' e o último '}'
+        start_idx = action_text.find('{')
+        end_idx = action_text.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1:
+            json_str = action_text[start_idx:end_idx+1]
+            tool_call = loads(json_str)
+        else:
+            return "Erro: Não consegui extrair o JSON da resposta da IA"
+        
+        kwargs = tool_call["action_input"]
+        match tool_call["action"]:
+            case "move":
+                result = move(**kwargs)
+                # Se for um Response do Flask, extrair JSON
+                if hasattr(result, 'get_json'):
+                    data = result.get_json()
+                else:
+                    data = result
+                direction = data.get('direction', '?')
+                consequence = data.get('consequence', 'unknown')
+                return f"Movimento para {direction}: {consequence}"
+            case "getSentidos":
+                return f"Sentidos: {getSentidos()}"
+            case "pegar_ouro":
+                pegar_ouro()
+                return "Ouro coletado com sucesso!"
+            case "borrow_book":
+                return 
+            case "return_book":
+                return 
+            case _:
+                return f'A ferramenta "{tool_call["action"]}" não existe. Confirme as funções disponíveis.'
+    except Exception as e:
+        return f"Erro ao processar ação da IA: {str(e)}"
 
 if __name__ == '__main__':
     print("Servidor iniciando em http://localhost:5000")

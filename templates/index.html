@@ -233,6 +233,9 @@
                     } else if (cell === 4) {
                         cellElement.classList.add('morto');
                         cellElement.textContent = '💀';
+                    } else if (cell === 5) {
+                        cellElement.classList.add('ouro');
+                        cellElement.textContent = '💰';
                     }
 
                     cellElement.addEventListener('click', () => {
@@ -281,6 +284,8 @@
             const command = commandInput.value.trim();
             if (!command) return;
 
+            commandInput.disabled = true;
+
             try {
                 const response = await fetch('/api/command', {
                     method: 'POST',
@@ -288,10 +293,31 @@
                     body: JSON.stringify({ command })
                 });
                 const data = await response.json();
-                renderArena(data.arena);
+                console.log("Resposta do servidor:", data);
+                
+                // Se há histórico de arenas, animar através delas
+                if (data.arena_history && Array.isArray(data.arena_history) && data.arena_history.length > 0) {
+                    console.log(`Animando ${data.arena_history.length} estados`);
+                    
+                    for (let arena of data.arena_history) {
+                        if (Array.isArray(arena)) {
+                            renderArena(arena);
+                            // Aguardar 500ms antes de mostrar o próximo estado
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                    }
+                } else if (data.arena && Array.isArray(data.arena)) {
+                    renderArena(data.arena);
+                } else {
+                    console.error("Arena inválida:", data.arena);
+                }
+                
+                commandInput.value = '';
                 console.log(`Comando executado: ${command}`);
             } catch (error) {
                 console.error('Erro ao executar comando:', error);
+            } finally {
+                commandInput.disabled = false;
             }
         }
 
