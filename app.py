@@ -10,6 +10,8 @@ load_dotenv()
 
 from langchain_groq import ChatGroq
 
+status_linhas = []
+
 llm = ChatGroq(
     model="qwen/qwen3-32b",
     api_key=os.getenv('GROQ_API_KEY'),
@@ -20,17 +22,20 @@ llm = ChatGroq(
 app = Flask(__name__)
 
 SYSTEM_PROMPT =""""
-Voce eh um agente inteligente que deve coletar o ouro e sair da arena. A arena é um grid 4x4, onde cada célula pode conter:
+Voce eh um agente inteligente que deve coletar o ouro e sair da arena. A arena é um grid 4x4, seus movimentos sao decido com base em sentidos do ambiente,por isso voce deve explorar o ambiente , onde cada célula pode conter:
 0: Célula vazia
 1: Buraco (obstáculo)  deve ser evitado
 2: Wumpus (monstro) deve ser evitado 
 3: Agente (sua posição atual)
 5: Ouro (objetivo) objetivo principal caso nao usuario nao especifique outra missao
 
+
 Você tem acesso às seguintes ferramentas:
 move(direcao): Move o agente para uma casa adjacente válida. As direções podem ser 'up', 'down', 'left' ou 'right'. e retorna uma consequência do movimento (ex: 'moved', 'bumped', 'falled').
-getSentidos(): checa o ambiente atual do agente, como brilho do ouro na posição atual ou próximo, fedor do wumpus no espaço vizinho e vento de buraco em uma area vizinha
-pegar_ouro(): Coleta o ouro quando você está na mesma posição que ele (quando getSentidos retorna brilho=true na sua posição)
+getSentidos(): checa o ambiente atual do agente, como brilho do ouro na posição atual, fedor do wumpus no espaço vizinho e vento de buraco em uma area vizinha
+pegar_ouro(): Coleta o ouro quando você está na mesma posição que ele (quando getSentidos retorna brilho=true na sua posição).
+
+Nao invente nenhum cenario, Caso voce nao receba nada no getSentido(), Me envie um Final Answer: Sentido Perdido.
 
 Para usar uma ferramenta, você deve responder com um JSON no seguinte formato:
 Action:
@@ -45,12 +50,15 @@ Action:
   "action_input": {"direcao": "up"}
 }
 
-O ciclo de interação deve ser SEMPRE:
+Sempre Um Comando de Cada vez.
+O passa a passo de interação deve ser SEMPRE: 
 Thought: Com base nas informações disponíveis, o que você acha que deveria fazer?
 Action: (o bloco JSON acima)
 Observation: (o resultado da ferramenta que eu te passarei)
-... (repetir se necessário)
+Next: (o proximo passo do ciclo)
 Final Answer: As observações e pensamentos não vão ficar disponíveis para o usuário. Crie uma resposta final em linguagem natural para ser apresentada ao usuário. Apenas escreva Final Answer quando tiver terminado tudo.
+
+NUNCA, mas em  hiptese NENHUMA, invente resultado da ferramenta, é proibido.
 """
 
 # Inicializar a arena 4x4
@@ -143,8 +151,25 @@ def index():
 def render_arena_display():
     """Renderiza a arena incluindo todos os objetos sem sobrescrever o agente"""
     arena_display = [[arena[i][j] for j in range(4)] for i in range(4)]
+    global person
+
+    if person.posicao is not None:
+        row, col = person.posicao
+        arena_display[row][col] = 3
     
-    # Adicionar objetos se não foram coletados/destruídos
+    # Recolocar buraco se não foi coletado/destruído
+    if objetos['buraco'] is not None:
+        x, y = objetos['buraco']
+        if arena_display[x][y] == 0:
+            arena_display[x][y] = 1
+    
+    # Recolocar Wumpus se não foi destruído
+    if objetos['wumpus'] is not None:
+        x, y = objetos['wumpus']
+        if arena_display[x][y] == 0:
+            arena_display[x][y] = 2
+    
+    # Adicionar ouro se não foi coletado
     if objetos['ouro'] is not None:
         x, y = objetos['ouro']
         if arena_display[x][y] == 0:
@@ -179,71 +204,94 @@ def move(direcao=None, direction=None):
         except:
             direction = None
     
+    if direction is None:
+        return jsonify({'consequence': 'invalid', 'direction': direction, 'arena': render_arena_display()})
+    
     result = move_logic({'direction': direction})
     return jsonify(result)
 
 def move_logic(data):
     """Lógica de movimento extraída da função move() para reutilização"""
-    global arena, person
+    global arena, person, status_linhas
     
     direction = data.get('direction')
-    print(f"DEBUG: direction recebida = '{direction}'")  # Debug
     consequence = 'invalid'  # Valor padrão
-
+    
+    # Validar direção
+    if direction not in ['up', 'down', 'left', 'right']:
+        return {'arena': render_arena_display(), 'consequence': consequence, 'direction': direction}
+    
     # Encontrar posição do agente
     row, col = person.posicao
 
     if direction == 'up':
+        status_linhas.append(f"Intenção de Movimento de Subida {row} {col} ")
         if row == 0:
+            status_linhas.append("parede a cima")
             consequence = 'bumped'
         elif arena[row - 1][col] == 1:  # Verifica se é buraco
+            person.posicao = [row - 1, col]  # Atualiza posição mesmo caindo
             arena[row][col] = 0
-            arena[row - 1][col] = 4  # Marca o agente como morto
             consequence = 'falled'
+            status_linhas.append("caiu no buraco")
         else:
             arena[row][col] = 0
             arena[row - 1][col] = 3
             person.posicao = [row - 1, col]  # Atualiza a posição do agente
             consequence = 'moved'
+            status_linhas.append(f" para {person.posicao[0]} {person.posicao[1]}")
 
     elif direction == 'down':
+        status_linhas.append(f"Intenção de Movimento de Baixo {row} {col} ")  
         if row == 3:
             consequence = 'bumped'
+            status_linhas.append("parede a baixo")
         elif arena[row + 1][col] == 1:
+            person.posicao = [row + 1, col]  # Atualiza posição mesmo caindo
             arena[row][col] = 0
-            arena[row + 1][col] = 4  # Marca o agente como morto
             consequence = 'falled'
+            status_linhas.append("caiu no buraco")
         else:
             arena[row][col] = 0
             arena[row + 1][col] = 3
             person.posicao = [row + 1, col]  # Atualiza a posição do agente
             consequence = 'moved'
+            status_linhas.append(f" para {person.posicao[0]} {person.posicao[1]}")
+
 
     elif direction == 'left':
+        status_linhas.append(f"Intenção de Movimento de Esquerda {row} {col} ")
         if col == 0:
+            status_linhas.append("parede a esquerda")
             consequence = 'bumped'
         elif arena[row][col - 1] == 1:
+            person.posicao = [row, col - 1]  # Atualiza posição mesmo caindo
             arena[row][col] = 0
-            arena[row][col - 1] = 4  # Marca o agente como morto
             consequence = 'falled'
+            status_linhas.append("caiu no buraco")
         else:
             arena[row][col] = 0
             arena[row][col - 1] = 3
             person.posicao = [row, col - 1]  # Atualiza a posição do agente
             consequence = 'moved'
+            status_linhas.append(f" para {person.posicao[0]} {person.posicao[1]}")
 
     elif direction == 'right':
+        status_linhas.append(f"Intenção de Movimento de Direita {row} {col} ")
         if col == 3:
             consequence = 'bumped'
+            status_linhas.append("parede a direita")
         elif arena[row][col + 1] == 1:
+            person.posicao = [row, col + 1]  # Atualiza posição mesmo caindo
             arena[row][col] = 0
-            arena[row][col + 1] = 4  # Marca o agente como morto
             consequence = 'falled'
+            status_linhas.append("caiu no buraco")
         else:
             arena[row][col] = 0
             arena[row][col + 1] = 3
             person.posicao = [row, col + 1]  # Atualiza a posição do agente
             consequence = 'moved'
+            status_linhas.append(f" para {person.posicao[0]} {person.posicao[1]}")
     
     # Retornar dicionário (será convertido em JSON pela chamadora)
     arena_display = render_arena_display()
@@ -252,7 +300,10 @@ def move_logic(data):
 
 @app.route('/api/command', methods=['POST'])
 def command():
-    global person, arena
+    global person, arena, status_linhas
+    
+    # Resetar o histórico de status para cada comando
+    status_linhas.clear()
     
     # Inicializar o jogo se ainda não foi inicializado
     if 'person' not in globals():
@@ -268,22 +319,23 @@ def command():
     print("iniciando IA\n")
     print(mensagemUser + "\n")
     print("\n");
-    for i in range (10):
+    for i in range (20):
         print(f"-------tentativa {i+1}-------\n")
 
         response = llm.invoke(messages)
         respostaIA = response.content.strip()
-        print(respostaIA)
+        print(f"{i} + {respostaIA}")
 
         if "Final Answer:" in respostaIA:
             print("IA chegou a uma resposta final. Encerrando o loop.")
-            # Adicionar estado final
             arena_history.append(render_arena_display())
+            status_linhas.append(f"rmais u dia feliz ebaa")
             break
         
         if "Action:" in respostaIA:
             resultadoFerramenta = call_tool(respostaIA)
             print(f"Resultado da ferramenta: {resultadoFerramenta}\n")
+            print("charava")
             
             # Adicionar estado atual ao histórico após a ação
             arena_history.append(render_arena_display())
@@ -291,7 +343,7 @@ def command():
             historico_turno = respostaIA + "\nResultado da ferramenta: " + str(resultadoFerramenta) +"\n"
             messages.append({"role": "assistant", "content": historico_turno})
         else:
-            print("IA não retornou uma ação válida. Encerrando o loop.")
+            print("IA não retornou uma ação válida. Encerrando os loops.")
             print(respostaIA)
             # Adicionar estado atual mesmo quando há erro
             arena_history.append(render_arena_display())
@@ -307,20 +359,26 @@ def command():
     
     # Usar o último estado do histórico
     final_arena = arena_history[-1] if arena_history else render_arena_display()
+    print(f"\n{'='*60}")
     print(f"DEBUG: Arena sendo retornada: {final_arena}")
     print(f"DEBUG: Histórico tem {len(arena_history)} estados")
+    print(f"DEBUG: posiçao do agente: {person.posicao}")
+    print(f"\n--- STATUS DO MOVIMENTO ---")
+    for i, status in enumerate(status_linhas, 1):
+        print(f"{i}. {status}")
+    print(f"{'='*60}\n")
     
     return jsonify({
         'arena': final_arena,
         'arena_history': arena_history,  # Novo: histórico de todos os estados
         'position': person.posicao,
         'has_arrow': person.has_arrow,
-        'has_gold': person.has_gold
+        'has_gold': person.has_gold,
+        'status_movimentos': status_linhas  # Adicionado ao JSON para visualização
     })
 
 def get_user_info():
     return jsonify({
-
         "position": person.posicao,
         "has_arrow": person.has_arrow,
         "has_gold": person.has_gold
@@ -355,6 +413,7 @@ def call_tool(response: str) -> str:
         kwargs = tool_call["action_input"]
         match tool_call["action"]:
             case "move":
+                status_linhas.append(f"Açao de movimento")
                 result = move(**kwargs)
                 # Se for um Response do Flask, extrair JSON
                 if hasattr(result, 'get_json'):
