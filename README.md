@@ -1,4 +1,4 @@
-# 🎮 MundoWunpus - Arena 8x8
+# 🎮 MundoWunpus - Arena 4x4
 
 Aplicação web em Python que simula uma arena 8x8 interativa com visualização em tempo real no navegador.
 
@@ -24,6 +24,8 @@ pip install -r requirements.txt
 Isso irá instalar:
 - **Flask** - Framework web Python
 - **Werkzeug** - Utilitários para WSGI
+
+
 
 ### 3️⃣ Executar o Servidor
 
