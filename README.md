@@ -26,6 +26,7 @@ Isso irá instalar:
 - **Werkzeug** - Utilitários para WSGI
 
 
+### Nao esqueça de adicionar a key da IA em .env
 
 ### 3️⃣ Executar o Servidor
 
