@@ -1,6 +1,6 @@
 # 🎮 MundoWunpus - Arena 4x4
 
-Aplicação web em Python que simula uma arena 8x8 interativa com visualização em tempo real no navegador.
+Venerando Santos (170327) e Ana Clara Atanazio Ogata (168482)
 
 ## 📋 Pré-requisitos
 
